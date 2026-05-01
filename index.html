@@ -98,16 +98,19 @@
       return (
         <div className="min-h-screen flex flex-col items-center py-8 px-4 font-sans text-gray-800">
           
-          {/* ✨ アプリ移動メニュー ✨ */}
-          <div className="flex flex-wrap gap-2 justify-center mb-6 w-full max-w-md">
-            <a href="./index.html" className="px-4 py-2 bg-gray-200 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-300 transition-colors shadow-sm">英→日チェッカー</a>
-            <span className="px-4 py-2 bg-red-600 rounded-lg text-sm font-bold text-white shadow-md">日→英チェッカー</span>
-            <a href="./type-checker.html" className="px-4 py-2 bg-gray-200 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-300 transition-colors shadow-sm">相性チェッカー</a>
+          {/* ✨ ページ切り替えメニュー ✨ */}
+          <div className="flex gap-4 justify-center mb-6 w-full max-w-md">
+            <span className="px-5 py-2 bg-red-600 rounded-lg text-sm font-bold text-white shadow-md">
+              🇯🇵 日 → 英チェッカー
+            </span>
+            <a href="./en-to-ja.html" className="px-5 py-2 bg-gray-200 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-300 transition-colors shadow-sm">
+              🇺🇸 英 → 日へ移動
+            </a>
           </div>
 
           <div className="w-full max-w-md bg-red-600 rounded-t-2xl p-6 shadow-lg relative overflow-hidden">
-            <h1 className="text-2xl font-black text-white relative z-10 text-center">ポケモン 翻訳＆発音</h1>
-            <p className="text-red-100 text-sm text-center mt-1 relative z-10">日本語名 → 英語名・発音チェッカー</p>
+            <h1 className="text-2xl font-black text-white relative z-10 text-center">ポケモン 翻訳チェッカー</h1>
+            <p className="text-red-100 text-sm text-center mt-1 relative z-10 font-bold">日本語名 → 英語名・発音</p>
           </div>
 
           <div className="w-full max-w-md bg-white rounded-b-2xl shadow-lg p-6 mb-8 border-t-8 border-gray-800">
