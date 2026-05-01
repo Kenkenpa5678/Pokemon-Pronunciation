@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ポケモンGO GBL相性補完ポケモン検索</title>
+  
+  <!-- Tailwind CSS (デザイン用) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- React (アプリを動かすための仕組み) -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans pb-12">
+  <!-- アプリが表示される場所 -->
+  <div id="root"></div>
+
+  <!-- アプリの本体プログラム -->
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    // --- アイコン用SVGコンポーネント ---
+    const SwordsIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"></polyline><line x1="13" y1="19" x2="19" y2="13"></line><line x1="16" y1="16" x2="20" y2="20"></line><line x1="19" y1="21" x2="21" y2="19"></line><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"></polyline><line x1="5" y1="14" x2="9" y2="10"></line><line x1="4" y1="16" x2="8" y2="20"></line><line x1="3" y1="19" x2="5" y2="21"></line></svg>;
+    const SearchIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-gray-400"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>;
+    const ChevronDownIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 text-gray-400"><polyline points="6 9 12 15 18 9"></polyline></svg>;
+    const AwardIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>;
+    const TargetIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><circle cx="12" cy="12" r="10"></circle><circle cx="12" cy="12" r="6"></circle><circle cx="12" cy="12" r="2"></circle></svg>;
+    const ShieldIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6 text-indigo-600"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>;
+
+    // --- タイプ相性表 ---
+    const TYPE_CHART = {
+      'ノーマル': { weak: ['かくとう'], resist: [], immune: ['ゴースト'] },
+      'ほのお': { weak: ['みず', 'じめん', 'いわ'], resist: ['ほのお', 'くさ', 'こおり', 'むし', 'はがね', 'フェアリー'], immune: [] },
+      'みず': { weak: ['くさ', 'でんき'], resist: ['ほのお', 'みず', 'こおり', 'はがね'], immune: [] },
+      'くさ': { weak: ['ほのお', 'こおり', 'どく', 'ひこう', 'むし'], resist: ['みず', 'でんき', 'くさ', 'じめん'], immune: [] },
+      'でんき': { weak: ['じめん'], resist: ['でんき', 'ひこう', 'はがね'], immune: [] },
+      'こおり': { weak: ['ほのお', 'かくとう', 'いわ', 'はがね'], resist: ['こおり'], immune: [] },
+      'かくとう': { weak: ['ひこう', 'エスパー', 'フェアリー'], resist: ['むし', 'いわ', 'あく'], immune: [] },
+      'どく': { weak: ['じめん', 'エスパー'], resist: ['くさ', 'かくとう', 'どく', 'むし', 'フェアリー'], immune: [] },
+      'じめん': { weak: ['みず', 'くさ', 'こおり'], resist: ['どく', 'いわ'], immune: ['でんき'] },
+      'ひこう': { weak: ['でんき', 'こおり', 'いわ'], resist: ['くさ', 'かくとう', 'むし'], immune: ['じめん'] },
+      'エスパー': { weak: ['むし', 'ゴースト', 'あく'], resist: ['かくとう', 'エスパー'], immune: [] },
+      'むし': { weak: ['ほのお', 'ひこう', 'いわ'], resist: ['くさ', 'かくとう', 'じめん'], immune: [] },
+      'いわ': { weak: ['みず', 'くさ', 'かくとう', 'じめん', 'はがね'], resist: ['ノーマル', 'ほのお', 'どく', 'ひこう'], immune: [] },
+      'ゴースト': { weak: ['ゴースト', 'あく'], resist: ['どく', 'むし'], immune: ['ノーマル', 'かくとう'] },
+      'ドラゴン': { weak: ['こおり', 'ドラゴン', 'フェアリー'], resist: ['ほのお', 'みず', 'くさ', 'でんき'], immune: [] },
+      'あく': { weak: ['かくとう', 'むし', 'フェアリー'], resist: ['ゴースト', 'あく'], immune: ['エスパー'] },
+      'はがね': { weak: ['ほのお', 'かくとう', 'じめん'], resist: ['ノーマル', 'くさ', 'こおり', 'ひこう', 'エスパー', 'むし', 'いわ', 'ドラゴン', 'はがね', 'フェアリー'], immune: ['どく'] },
+      'フェアリー': { weak: ['どく', 'はがね'], resist: ['かくとう', 'むし', 'あく'], immune: ['ドラゴン'] }
+    };
+
+    const TYPE_COLORS = {
+      'ノーマル': 'bg-gray-400 text-white', 'ほのお': 'bg-red-500 text-white', 'みず': 'bg-blue-500 text-white',
+      'くさ': 'bg-green-500 text-white', 'でんき': 'bg-yellow-400 text-black', 'こおり': 'bg-cyan-400 text-black',
+      'かくとう': 'bg-orange-600 text-white', 'どく': 'bg-purple-500 text-white', 'じめん': 'bg-amber-600 text-white',
+      'ひこう': 'bg-indigo-400 text-white', 'エスパー': 'bg-pink-500 text-white', 'むし': 'bg-lime-500 text-black',
+      'いわ': 'bg-yellow-700 text-white', 'ゴースト': 'bg-purple-700 text-white', 'ドラゴン': 'bg-indigo-600 text-white',
+      'あく': 'bg-gray-800 text-white', 'はがね': 'bg-gray-500 text-white', 'フェアリー': 'bg-pink-300 text-black'
+    };
+
+    // --- GBL頻出ポケモンデータベース ---
+    const POKEMON_DATA_RAW = [
+      { name: 'トリデプス', types: ['いわ', 'はがね'], scp: 2380 },
+      { name: 'ブラッキー', types: ['あく'], scp: 2250 },
+      { name: 'レジスチル', types: ['はがね'], scp: 2200 },
+      { name: 'ベロリンガ', types: ['ノーマル'], scp: 2200 },
+      { name: 'ベロベルト', types: ['ノーマル'], scp: 2150 },
+      { name: 'マリルリ', types: ['みず', 'フェアリー'], scp: 2150 },
+      { name: 'バルジーナ', types: ['あく', 'ひこう'], scp: 2150 },
+      { name: 'デオキシス(D)', types: ['エスパー'], scp: 2150 },
+      { name: 'ドヒドイデ', types: ['どく', 'みず'], scp: 2120 },
+      { name: 'ガラルマッギョ', types: ['じめん', 'はがね'], scp: 2100 },
+      { name: 'マッギョ', types: ['じめん', 'でんき'], scp: 2100 },
+      { name: 'クレセリア', types: ['エスパー'], scp: 2100 },
+      { name: 'アクジキング', types: ['あく', 'ドラゴン'], scp: 2100 },
+      { name: 'ブルンゲル', types: ['みず', 'ゴースト'], scp: 2050 },
+      { name: 'チルタリス', types: ['ドラゴン', 'ひこう'], scp: 2050 },
+      { name: 'ヨクバリス', types: ['ノーマル'], scp: 2050 },
+      { name: 'ハガネール', types: ['はがね', 'じめん'], scp: 2050 },
+      { name: 'ドオー', types: ['どく', 'じめん'], scp: 2050 },
+      { name: 'パンプジン(とくだい)', types: ['ゴースト', 'くさ'], scp: 2050 },
+      { name: 'ユレイドル', types: ['いわ', 'くさ'], scp: 2050 },
+      { name: 'ノコッチ', types: ['ノーマル'], scp: 2050 },
+      { name: 'ガラルサニーゴ', types: ['ゴースト'], scp: 2050 },
+      { name: 'ランターン', types: ['みず', 'でんき'], scp: 2000 },
+      { name: 'ナマズン', types: ['みず', 'じめん'], scp: 2000 },
+      { name: 'ズルズキン', types: ['あく', 'かくとう'], scp: 2000 },
+      { name: 'スリーパー', types: ['エスパー'], scp: 2000 },
+      { name: 'ヌオー', types: ['みず', 'じめん'], scp: 2000 },
+      { name: 'フォレトス', types: ['むし', 'はがね'], scp: 2000 },
+      { name: 'トリトドン', types: ['みず', 'じめん'], scp: 2000 },
+      { name: 'ガラルマタドガス', types: ['どく', 'フェアリー'], scp: 1980 },
+      { name: 'チャーレム', types: ['かくとう', 'エスパー'], scp: 1950 },
+      { name: 'ニドクイン', types: ['どく', 'じめん'], scp: 1950 },
+      { name: 'トドゼルガ', types: ['こおり', 'みず'], scp: 1950 },
+      { name: 'ニョロボン', types: ['みず', 'かくとう'], scp: 1950 },
+      { name: 'グライガー', types: ['じめん', 'ひこう'], scp: 1950 },
+      { name: 'アーマーガア', types: ['はがね', 'ひこう'], scp: 1950 },
+      { name: 'ナットレイ', types: ['くさ', 'はがね'], scp: 1950 },
+      { name: 'プクリン', types: ['ノーマル', 'フェアリー'], scp: 1950 },
+      { name: 'デカヌチャン', types: ['フェアリー', 'はがね'], scp: 1950 },
+      { name: 'ミミズズ', types: ['はがね'], scp: 1950 },
+      { name: 'フラージェス', types: ['フェアリー'], scp: 1950 },
+      { name: 'ゴーゴート', types: ['くさ'], scp: 1950 },
+      { name: 'ギルガルド(シールド)', types: ['はがね', 'ゴースト'], scp: 1950 },
+      { name: 'ファイヤー(ガラル)', types: ['あく', 'ひこう'], scp: 1950 },
+      { name: 'エアームド', types: ['はがね', 'ひこう'], scp: 1900 },
+      { name: 'ピジョット', types: ['ノーマル', 'ひこう'], scp: 1900 },
+      { name: 'アローラサンドパン', types: ['こおり', 'はがね'], scp: 1900 },
+      { name: 'オーダイル', types: ['みず'], scp: 1900 },
+      { name: 'デンヂムシ', types: ['むし', 'でんき'], scp: 1900 },
+      { name: 'ドラピオン', types: ['どく', 'あく'], scp: 1900 },
+      { name: 'ピクシー', types: ['フェアリー'], scp: 1900 },
+      { name: 'ホルード', types: ['ノーマル', 'じめん'], scp: 1900 },
+      { name: 'ラグラージ', types: ['みず', 'じめん'], scp: 1850 },
+      { name: 'フシギバナ', types: ['くさ', 'どく'], scp: 1850 },
+      { name: 'ヤミラミ', types: ['あく', 'ゴースト'], scp: 1850 },
+      { name: 'アローラキュウコン', types: ['こおり', 'フェアリー'], scp: 1850 },
+      { name: 'コノヨザル', types: ['かくとう', 'ゴースト'], scp: 1850 },
+      { name: 'ペリッパー', types: ['みず', 'ひこう'], scp: 1850 },
+      { name: 'カラマネロ', types: ['あく', 'エスパー'], scp: 1850 },
+      { name: 'ジャラランガ', types: ['ドラゴン', 'かくとう'], scp: 1850 },
+      { name: 'ラウドボーン', types: ['ほのお', 'ゴースト'], scp: 1850 },
+      { name: 'クレッフィ', types: ['はがね', 'フェアリー'], scp: 1850 },
+      { name: 'ゴルバット', types: ['どく', 'ひこう'], scp: 1850 },
+      { name: 'アローラガラガラ', types: ['ほのお', 'ゴースト'], scp: 1850 },
+      { name: 'ユキノオー', types: ['くさ', 'こおり'], scp: 1850 },
+      { name: 'オオタチ', types: ['ノーマル'], scp: 1850 },
+      { name: 'トゲキッス', types: ['フェアリー', 'ひこう'], scp: 1850 },
+      { name: 'デンリュウ', types: ['でんき'], scp: 1850 },
+      { name: 'コモルー', types: ['ドラゴン'], scp: 1850 },
+      { name: 'ガラガラ', types: ['じめん'], scp: 1850 },
+      { name: 'ルンパッパ', types: ['みず', 'くさ'], scp: 1850 },
+      { name: 'マグカルゴ', types: ['ほのお', 'いわ'], scp: 1850 },
+      { name: 'オーロット', types: ['ゴースト', 'くさ'], scp: 1800 },
+      { name: 'ファイアロー', types: ['ほのお', 'ひこう'], scp: 1800 },
+      { name: 'オニドリル', types: ['ノーマル', 'ひこう'], scp: 1800 },
+      { name: 'モルペコ(まんぷく)', types: ['でんき', 'あく'], scp: 1800 },
+      { name: 'バクーダ', types: ['ほのお', 'じめん'], scp: 1800 },
+      { name: 'ドデカバシ', types: ['ノーマル', 'ひこう'], scp: 1800 },
+      { name: 'エンペルト', types: ['みず', 'はがね'], scp: 1800 },
+      { name: 'ユキメノコ', types: ['こおり', 'ゴースト'], scp: 1750 },
+      { name: 'リザードン', types: ['ほのお', 'ひこう'], scp: 1750 },
+      { name: 'ドクロッグ', types: ['どく', 'かくとう'], scp: 1700 },
+      { name: 'ネギガナイト', types: ['かくとう'], scp: 1700 },
+      { name: 'ライチュウ', types: ['でんき'], scp: 1700 },
+      { name: 'アローラライチュウ', types: ['でんき', 'エスパー'], scp: 1700 },
+      { name: 'ネイティオ', types: ['ひこう', 'エスパー'], scp: 1700 },
+      { name: 'カイリキー', types: ['かくとう'], scp: 1700 },
+      { name: 'オコリザル', types: ['かくとう'], scp: 1700 },
+      { name: 'マスカーニャ', types: ['くさ', 'あく'], scp: 1700 },
+      { name: 'バシャーモ', types: ['ほのお', 'かくとう'], scp: 1700 },
+      { name: 'ワカシャモ', types: ['ほのお', 'かくとう'], scp: 1700 },
+      { name: 'ルカリオ', types: ['かくとう', 'はがね'], scp: 1600 }
+    ];
+
+    const POKEMON_DB = [...POKEMON_DATA_RAW]
+      .sort((a, b) => b.scp - a.scp)
+      .map((p, index) => ({ ...p, scpRank: index + 1 }));
+
+    const calculateMultipliers = (types) => {
+      const mults = {};
+      Object.keys(TYPE_CHART).forEach(attackerType => {
+        let multiplier = 1;
+        types.forEach(defenderType => {
+          const chart = TYPE_CHART[defenderType];
+          if (chart.weak.includes(attackerType)) multiplier *= 1.6;
+          else if (chart.resist.includes(attackerType)) multiplier *= 0.625;
+          else if (chart.immune.includes(attackerType)) multiplier *= 0.390625;
+        });
+        mults[attackerType] = multiplier;
+      });
+      return mults;
+    };
+
+    const TypeBadge = ({ type, text }) => (
+      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${TYPE_COLORS[type] || 'bg-gray-200 text-gray-800'}`}>
+        {text || type}
+      </span>
+    );
+
+    function App() {
+      const [searchTerm, setSearchTerm] = useState('');
+      const [selectedPokemon, setSelectedPokemon] = useState(null);
+      const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+      const filteredPokemon = useMemo(() => {
+        return POKEMON_DB.filter(p => p.name.includes(searchTerm));
+      }, [searchTerm]);
+
+      const selectedWeaknesses = useMemo(() => {
+        if (!selectedPokemon) return [];
+        const mults = calculateMultipliers(selectedPokemon.types);
+        return Object.keys(mults).filter(t => mults[t] > 1).map(t => ({
+          type: t,
+          multiplier: mults[t]
+        }));
+      }, [selectedPokemon]);
+
+      const synergisticPartners = useMemo(() => {
+        if (!selectedPokemon || selectedWeaknesses.length === 0) return [];
+        const p1Mults = calculateMultipliers(selectedPokemon.types);
+        const p1WeakTypes = selectedWeaknesses.map(w => w.type);
+
+        let candidates = POKEMON_DB.filter(p2 => {
+          if (p2.name === selectedPokemon.name) return false;
+          const p2Mults = calculateMultipliers(p2.types);
+          let coversCount = 0;
+          let sharedWeaknesses = 0;
+          let coveredTypes = [];
+
+          p1WeakTypes.forEach(weakType => {
+            if (p2Mults[weakType] < 1) {
+              coversCount++;
+              coveredTypes.push(weakType);
+            }
+          });
+
+          Object.keys(p2Mults).forEach(t => {
+            if (p1Mults[t] > 1 && p2Mults[t] > 1) {
+              sharedWeaknesses++;
+            }
+          });
+
+          p2.coversCount = coversCount;
+          p2.sharedCount = sharedWeaknesses;
+          p2.coveredTypes = coveredTypes;
+          return coversCount > 0;
+        });
+
+        let bestPartners = candidates.filter(p => p.sharedCount === 0);
+        if (bestPartners.length < 10) {
+          const fallbackPartners = candidates.filter(p => p.sharedCount === 1);
+          bestPartners = [...bestPartners, ...fallbackPartners];
+        }
+
+        bestPartners.sort((a, b) => a.scpRank - b.scpRank);
+        return Array.from(new Set(bestPartners)).slice(0, 10);
+      }, [selectedPokemon, selectedWeaknesses]);
+
+      return (
+        <div>
+          <header className="bg-indigo-600 text-white shadow-md py-4 px-6 mb-6">
+            <div className="max-w-3xl mx-auto flex items-center gap-3">
+              <SwordsIcon />
+              <h1 className="text-xl font-bold">ポケモンGO GBL相性補完ポケモン検索</h1>
+            </div>
+          </header>
+
+          <main className="max-w-3xl mx-auto px-4">
+            <section className="mb-8 relative">
+              <label className="block text-sm font-semibold text-slate-700 mb-2">
+                基準となるポケモンを選択
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <SearchIcon />
+                </div>
+                <input
+                  type="text"
+                  className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-white shadow-sm"
+                  placeholder="ポケモンの名前を入力 (例: マリルリ)"
+                  value={searchTerm}
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setIsDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsDropdownOpen(true)}
+                />
+                <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                  <ChevronDownIcon />
+                </div>
+              </div>
+
+              {isDropdownOpen && searchTerm && (
+                <ul className="absolute z-10 mt-1 w-full bg-white shadow-lg max-h-60 rounded-md py-1 text-base ring-1 ring-black ring-opacity-5 overflow-auto focus:outline-none sm:text-sm">
+                  {filteredPokemon.length > 0 ? (
+                    filteredPokemon.map((p) => (
+                      <li
+                        key={p.name}
+                        className="cursor-pointer select-none relative py-2 pl-3 pr-9 hover:bg-indigo-50 flex items-center gap-2"
+                        onClick={() => {
+                          setSelectedPokemon(p);
+                          setSearchTerm(p.name);
+                          setIsDropdownOpen(false);
+                        }}
+                      >
+                        <span className="font-medium text-gray-900">{p.name}</span>
+                        <div className="flex gap-1 ml-auto">
+                          {p.types.map(t => <TypeBadge key={t} type={t} />)}
+                        </div>
+                      </li>
+                    ))
+                  ) : (
+                    <li className="cursor-default select-none relative py-2 pl-3 pr-9 text-gray-500">
+                      見つかりませんでした
+                    </li>
+                  )}
+                </ul>
+              )}
+            </section>
+
+            {selectedPokemon && (
+              <section className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-8">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4 mb-4">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900 mb-2">{selectedPokemon.name}</h2>
+                    <div className="flex gap-2">
+                      {selectedPokemon.types.map(t => <TypeBadge key={t} type={t} />)}
+                    </div>
+                  </div>
+                  <div className="bg-indigo-50 text-indigo-700 px-4 py-2 rounded-lg font-semibold flex items-center gap-2">
+                    <AwardIcon />
+                    SCP順位: {selectedPokemon.scpRank}位
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-500 mb-3 flex items-center gap-1">
+                    <TargetIcon /> このポケモンの弱点
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedWeaknesses.map(w => (
+                      <div key={w.type} className="flex items-center gap-1 bg-red-50 px-2 py-1 rounded border border-red-100">
+                        <TypeBadge type={w.type} />
+                        <span className="text-xs font-bold text-red-600">
+                          {w.multiplier > 2 ? '二重弱点' : '弱点'}
+                        </span>
+                      </div>
+                    ))}
+                    {selectedWeaknesses.length === 0 && (
+                      <span className="text-gray-500 text-sm">弱点はありません</span>
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {selectedPokemon && (
+              <section>
+                <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <ShieldIcon />
+                  相性の良いポケモン Top10
+                </h2>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {synergisticPartners.map((partner, index) => (
+                    <div key={partner.name} className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-center gap-2">
+                          <span className={`flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${index < 3 ? 'bg-yellow-400 text-yellow-900' : 'bg-gray-200 text-gray-700'}`}>
+                            {index + 1}
+                          </span>
+                          <h3 className="text-lg font-bold text-gray-900">{partner.name}</h3>
+                        </div>
+                        <div className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-1 rounded">
+                          SCP {partner.scpRank}位
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-1 mb-4">
+                        {partner.types.map(t => <TypeBadge key={t} type={t} />)}
+                      </div>
+
+                      <div className="bg-green-50 p-3 rounded-md border border-green-100">
+                        <div className="text-xs font-bold text-green-800 mb-1">カバーできる弱点:</div>
+                        <div className="flex flex-wrap gap-1">
+                          {partner.coveredTypes.map(t => (
+                            <TypeBadge key={t} type={t} text={`耐性: ${t}`} />
+                          ))}
+                        </div>
+                      </div>
+                      
+                      {partner.sharedCount > 0 && (
+                        <div className="mt-2 text-xs text-amber-600 flex items-center gap-1">
+                          ⚠️ 共通の弱点が {partner.sharedCount} つあります
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+          </main>
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
