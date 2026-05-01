@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pokemon Translator (英→日)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    @keyframes spin-slow { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+    .fade-in { animation: fadeIn 0.3s ease-in-out; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen">
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    const kanaToRoman = (kana) => {
+      const romanMap = {'ア':'a','イ':'i','ウ':'u','エ':'e','オ':'o','カ':'ka','キ':'ki','ク':'ku','ケ':'ke','コ':'ko','サ':'sa','シ':'shi','ス':'su','セ':'se','ソ':'so','タ':'ta','チ':'chi','ツ':'tsu','テ':'te','ト':'to','ナ':'na','ニ':'ni','ヌ':'nu','ネ':'ne','ノ':'no','ハ':'ha','ヒ':'hi','フ':'fu','ヘ':'he','ホ':'ho','マ':'ma','ミ':'mi','ム':'mu','メ':'me','モ':'mo','ヤ':'ya','ユ':'yu','ヨ':'yo','ラ':'ra','リ':'ri','ル':'ru','レ':'re','ロ':'ro','ワ':'wa','ヲ':'o','ン':'n','ガ':'ga','ギ':'gi','グ':'gu','ゲ':'ge','ゴ':'go','ザ':'za','ジ':'ji','ズ':'zu','ゼ':'ze','ゾ':'zo','ダ':'da','ヂ':'ji','ヅ':'zu','デ':'de','ド':'do','バ':'ba','ビ':'bi','ブ':'bu','ベ':'be','ボ':'bo','パ':'pa','ピ':'pi','プ':'pu','ペ':'pe','ポ':'po','キャ':'kya','キュ':'kyu','キョ':'kyo','シャ':'sha','シュ':'shu','ショ':'sho','チャ':'cha','チュ':'chu','チョ':'cho','ニャ':'nya','ニュ':'nyu','ニョ':'nyo','ヒャ':'hya','ヒュ':'hyu','ヒョ':'hyo','ミャ':'mya','ミュ':'myu','ミョ':'myo','リャ':'rya','リュ':'ryu','リョ':'ryo','ギャ':'gya','ギュ':'gyu','ギョ':'gyo','ジャ':'ja','ジュ':'ju','ジョ':'jo','ビャ':'bya','ビュ':'byu','ビョ':'byo','ピャ':'pya','ピュ':'pyu','ピョ':'pyo','ファ':'fa','フィ':'fi','フェ':'fe','フォ':'fo','ヴァ':'va','ヴィ':'vi','ヴ':'vu','ヴェ':'ve','ヴォ':'vo','ティ':'ti','ディ':'di','ウィ':'wi','ウェ':'we','ウォ':'wo','チェ':'che','ジェ':'je','シェ':'she','ツァ':'tsa','ツィ':'tsi','ツェ':'tse','ツォ':'tso','ー':'-'};
+      let result = '', i = 0;
+      while (i < kana.length) {
+        let char = kana[i], nextChar = kana[i + 1] || '', twoChar = char + nextChar;
+        if (romanMap[twoChar]) { result += romanMap[twoChar]; i += 2; }
+        else if (char === 'ッ') {
+          let nextRoman = romanMap[nextChar] || romanMap[nextChar + kana[i+2]];
+          if (nextRoman) result += nextRoman[0]; i++;
+        }
+        else if (romanMap[char]) { result += romanMap[char]; i++; }
+        else { result += char; i++; }
+      }
+      return result;
+    };
+
+    const estimateKatakana = (englishName) => {
+      let s = englishName.toLowerCase();
+      const rules = [[/ae/g,'イー'],[/ai/g,'エイ'],[/au/g,'オー'],[/aw/g,'オー'],[/ay/g,'エイ'],[/ea/g,'イー'],[/ee/g,'イー'],[/ei/g,'エイ'],[/eu/g,'ユー'],[/ew/g,'ユー'],[/ey/g,'イー'],[/ie/g,'イー'],[/igh/g,'アイ'],[/oa/g,'オー'],[/oe/g,'オー'],[/oi/g,'オイ'],[/oo/g,'ウー'],[/ou/g,'アウ'],[/ow/g,'アウ'],[/oy/g,'オイ'],[/ue/g,'ユー'],[/ui/g,'ウィ'],[/uy/g,'アイ'],[/ar/g,'アー'],[/er/g,'アー'],[/ir/g,'アー'],[/or/g,'オー'],[/ur/g,'アー'],[/ph/g,'フ'],[/ch/g,'チ'],[/sh/g,'シュ'],[/th/g,'ス'],[/wh/g,'ホ'],[/ck/g,'ク'],[/ng/g,'ング'],[/tion/g,'ション'],[/sion/g,'ジョン'],[/ture/g,'チャー'],[/ce/g,'ス'],[/ci/g,'シ'],[/cy/g,'シ'],[/ge/g,'ジ'],[/gi/g,'ジ'],[/gy/g,'ジ'],[/kn/g,'ン'],[/wr/g,'ル'],[/mb/g,'ム'],[/a/g,'ア'],[/b/g,'ブ'],[/c/g,'ク'],[/d/g,'ド'],[/e/g,'エ'],[/f/g,'フ'],[/g/g,'グ'],[/h/g,'ハ'],[/i/g,'イ'],[/j/g,'ジ'],[/k/g,'ク'],[/l/g,'ル'],[/m/g,'ム'],[/n/g,'ン'],[/o/g,'オ'],[/p/g,'プ'],[/q/g,'ク'],[/r/g,'ル'],[/s/g,'ス'],[/t/g,'ト'],[/u/g,'ウ'],[/v/g,'ヴ'],[/w/g,'ワ'],[/x/g,'クス'],[/y/g,'ヤ'],[/z/g,'ズ'],[/-/g,'ー']];
+      for (const [reg, kana] of rules) s = s.replace(reg, kana);
+      return s.replace(/アア/g,'アー').replace(/イイ/g,'イー').replace(/ウウ/g,'ウー').replace(/エエ/g,'エー').replace(/オオ/g,'オー');
+    };
+
+    const SearchIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-400"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>;
+    const VolumeIcon = () => <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.54 8.46a5 5 0 0 1 0 7.07"></path><path d="M19.07 4.93a10 10 0 0 1 0 14.14"></path></svg>;
+
+    function App() {
+      const [pokemonList, setPokemonList] = useState([]);
+      const [input, setInput] = useState('');
+      const [suggestions, setSuggestions] = useState([]);
+      const [selectedPokemon, setSelectedPokemon] = useState(null);
+      const [loading, setLoading] = useState(true);
+
+      useEffect(() => {
+        const fetchAllPokemon = async () => {
+          const query = `query { pokemon_v2_pokemonspecies(order_by: {id: asc}) { id pokemon_v2_pokemonspeciesnames(where: {language_id: {_in: [1, 9]}}) { name language_id } } }`;
+          try {
+            const response = await fetch('https://beta.pokeapi.co/graphql/v1beta', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query }) });
+            const data = await response.json();
+            const pList = [];
+            data.data.pokemon_v2_pokemonspecies.forEach(species => {
+              let jaName = '', enName = '';
+              species.pokemon_v2_pokemonspeciesnames.forEach(n => { if (n.language_id === 1) jaName = n.name; if (n.language_id === 9) enName = n.name; });
+              if (jaName && enName) pList.push({ ja: jaName, en: enName, id: species.id });
+            });
+            setPokemonList(pList);
+            setLoading(false);
+          } catch (e) { console.error(e); setLoading(false); }
+        };
+        fetchAllPokemon();
+      }, []);
+
+      const handleInputChange = (e) => {
+        const val = e.target.value;
+        setInput(val);
+        if (!val.trim()) { setSuggestions([]); setSelectedPokemon(null); return; }
+        const lowerVal = val.toLowerCase();
+        const matches = pokemonList.filter(p => p.en.toLowerCase().includes(lowerVal)).slice(0, 8);
+        setSuggestions(matches);
+        const exactMatch = pokemonList.find(p => p.en.toLowerCase() === lowerVal);
+        if (exactMatch) { setSelectedPokemon(exactMatch); setSuggestions([]); } else { setSelectedPokemon(null); }
+      };
+
+      const handleSelect = (pokemon) => { setInput(pokemon.en); setSelectedPokemon(pokemon); setSuggestions([]); };
+
+      const speak = (text, lang) => {
+        if (!('speechSynthesis' in window)) return;
+        window.speechSynthesis.cancel();
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = lang; utterance.rate = 0.9;
+        window.speechSynthesis.speak(utterance);
+      };
+
+      if (loading) return <div className="min-h-screen flex items-center justify-center font-bold text-gray-500">Loading Data...</div>;
+
+      return (
+        <div className="min-h-screen flex flex-col items-center py-8 px-4 font-sans text-gray-800">
+          
+          {/* ✨ ページ切り替えメニュー ✨ */}
+          <div className="flex gap-4 justify-center mb-6 w-full max-w-md">
+            <a href="./index.html" className="px-5 py-2 bg-gray-200 rounded-lg text-sm font-bold text-gray-700 hover:bg-gray-300 transition-colors shadow-sm">
+              🇯🇵 日 → 英へ移動
+            </a>
+            <span className="px-5 py-2 bg-blue-600 rounded-lg text-sm font-bold text-white shadow-md">
+              🇺🇸 英 → 日チェッカー
+            </span>
+          </div>
+
+          <div className="w-full max-w-md bg-blue-600 rounded-t-2xl p-6 shadow-lg relative overflow-hidden">
+            <h1 className="text-2xl font-black text-white relative z-10 text-center">Pokemon Translator</h1>
+            <p className="text-blue-100 text-sm text-center mt-1 relative z-10 font-bold">English Name → Japanese</p>
+          </div>
+
+          <div className="w-full max-w-md bg-white rounded-b-2xl shadow-lg p-6 mb-8 border-t-8 border-gray-800">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><SearchIcon /></div>
+              <input type="text" className="block w-full pl-10 pr-3 py-3 border-2 border-gray-200 rounded-xl leading-5 bg-gray-50 focus:bg-white focus:border-blue-500 font-bold" placeholder="Enter Pokemon name (e.g., Pikachu)" value={input} onChange={handleInputChange} />
+              {suggestions.length > 0 && !selectedPokemon && (
+                <ul className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden divide-y divide-gray-100">
+                  {suggestions.map((p) => <li key={p.id} className="px-4 py-3 hover:bg-blue-50 cursor-pointer flex justify-between" onClick={() => handleSelect(p)}><span className="font-bold">{p.en}</span><span className="text-gray-400 text-sm">{p.ja}</span></li>)}
+                </ul>
+              )}
+            </div>
+
+            {selectedPokemon && (
+              <div className="mt-8 flex flex-col items-center fade-in">
+                <div className="w-40 h-40 bg-gray-100 rounded-full flex items-center justify-center p-4 border-4 border-white shadow-inner mb-6 relative">
+                  <img src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${selectedPokemon.id}.png`} alt={selectedPokemon.en} className="w-full h-full object-contain" />
+                </div>
+                
+                <div className="w-full space-y-4">
+                  <div className="bg-gradient-to-br from-red-500 to-red-600 rounded-2xl p-5 text-white shadow-md">
+                    <div className="text-red-100 text-xs font-bold mb-2 uppercase">Japanese Name</div>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h2 className="text-3xl font-black">{selectedPokemon.ja}</h2>
+                        <span className="text-red-50 font-mono text-sm">ROMAJI: {kanaToRoman(selectedPokemon.ja)}</span>
+                      </div>
+                      <button onClick={() => speak(selectedPokemon.ja, 'ja-JP')} className="w-12 h-12 bg-white text-red-600 rounded-full flex items-center justify-center shadow-lg"><VolumeIcon /></button>
+                    </div>
+                  </div>
+
+                  <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-5 text-white shadow-md">
+                    <div className="text-blue-100 text-xs font-bold mb-2 uppercase">English Name</div>
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h2 className="text-3xl font-black">{selectedPokemon.en}</h2>
+                        <span className="text-blue-50 font-bold text-sm">推測: {estimateKatakana(selectedPokemon.en)}</span>
+                      </div>
+                      <button onClick={() => speak(selectedPokemon.en, 'en-US')} className="w-12 h-12 bg-white text-blue-600 rounded-full flex items-center justify-center shadow-lg"><VolumeIcon /></button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+    const root = ReactDOM.createRoot(document.getElementById('root')); root.render(<App />);
+  </script>
+</body>
+</html>
